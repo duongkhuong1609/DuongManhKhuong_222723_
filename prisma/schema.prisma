@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+// ============================================
+// SEMESTERS (Học kỳ)
+// ============================================
+model Semester {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique
+  name          String
+  shortName     String
+  semesterNumber Int     // 1, 2, or 3 (summer)
+  academicYear  String
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean  @default(true)
+  isCurrent     Boolean  @default(false)
+  status        String   @default("upcoming") // upcoming, ongoing, completed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  classes       Class[]
+  schedules     Schedule[]
+
+  @@index([academicYear])
+  @@index([isActive, isCurrent])
+  @@index([status])
+}
+
+// ============================================
+// INSTRUCTORS (Giảng viên)
+// ============================================
+model Instructor {
+  id                 Int      @id @default(autoincrement())
+  code               String   @unique
+  name               String
+  email              String   @unique
+  phone              String?
+  department         String
+  position           String   @default("Giảng viên")
+  maxHoursPerWeek    Int      @default(20)
+  specializations    String?  // JSON array as string
+  teachingNotes      String?  // Ghi chú nguyện vọng
+  status             String   @default("active") // active, inactive, on_leave
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  classes            Class[]
+  schedules          Schedule[]
+
+  @@index([department])
+  @@index([status])
+  @@index([email])
+}
+
+// ============================================
+// ROOMS (Phòng học)
+// ============================================
+model Room {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  name       String
+  building   String
+  floor      Int
+  capacity   Int
+  type       String   @default("lecture") // lecture, lab, seminar, auditorium
+  equipment  String?  // JSON array as string
+  status     String   @default("available") // available, maintenance, unavailable
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  schedules  Schedule[]
+
+  @@index([building])
+  @@index([type])
+  @@index([status])
+  @@index([capacity])
+}
+
+// ============================================
+// COURSES (Môn học)
+// ============================================
+model Course {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique
+  name           String
+  credits        Int
+  theoryHours    Int      @default(0)
+  practiceHours  Int      @default(0)
+  department     String
+  description    String?
+  prerequisites  String?  // JSON array of course IDs
+  status         String   @default("active") // active, inactive
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  classes        Class[]
+
+  @@index([department])
+  @@index([status])
+}
+
+// ============================================
+// TIMESLOTS (Tiết học)
+// ============================================
+model Timeslot {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  startTime String   // "07:00"
+  endTime   String   // "07:50"
+  period    String   // morning, afternoon, evening
+  order     Int      // 1, 2, 3...
+  status    String   @default("active") // active, inactive
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  schedules Schedule[]
+
+  @@index([period])
+  @@index([order])
+}
+
+// ============================================
+// CLASSES (Lớp học)
+// ============================================
+model Class {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique
+  courseId      Int
+  instructorId  Int
+  semester      String
+  academicYear  String
+  studentCount  Int      @default(0)
+  maxStudents   Int
+  status        String   @default("scheduled") // scheduled, ongoing, completed, cancelled
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  course        Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructor    Instructor  @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  semester_rel  Semester    @relation(fields: [semester], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  schedules     Schedule[]
+
+  @@index([courseId])
+  @@index([instructorId])
+  @@index([semester])
+  @@index([status])
+}
+
+// ============================================
+// SCHEDULES (Lịch biểu)
+// ============================================
+model Schedule {
+  id           Int      @id @default(autoincrement())
+  classId      Int
+  roomId       Int
+  timeslotId   Int
+  dayOfWeek    Int      // 2-7 (Thứ 2 - Thứ 7)
+  weekStart    DateTime
+  weekEnd      DateTime
+  semester     String
+  academicYear String
+  isRecurring  Boolean  @default(true)
+  status       String   @default("active") // active, cancelled, rescheduled
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  class        Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  room         Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  timeslot     Timeslot  @relation(fields: [timeslotId], references: [id], onDelete: Cascade)
+  semester_rel Semester  @relation(fields: [semester], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  instructor_rel Instructor @relation(fields: [instructorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  instructorId Int
+
+  @@index([classId])
+  @@index([roomId])
+  @@index([timeslotId])
+  @@index([semester])
+  @@index([dayOfWeek])
+  @@index([status])
+}
